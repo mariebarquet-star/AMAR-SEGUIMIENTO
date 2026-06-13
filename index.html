@@ -769,7 +769,7 @@ async function connectSheets(){
   toast('Conectando con Sheets…');
   Remote.url=url;
   try{
-    let rows=await Remote.list();
+    let rows=(await Remote.list()).map(normTask);
     if(!rows.length){ rows=(state.tasks&&state.tasks.length)?state.tasks:SEED.map(t=>({...t})); await Remote.bulk(rows); }
     state.tasks=rows; await saveCfg(url); updateConnPill(); closeConn(); renderAll();
     toast('Conectado a Google Sheets');
@@ -788,7 +788,30 @@ const state = { tasks:[], view:'resumen', editId:null, gantOrder:'inicio', order
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const DOWS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
-function parseD(s){ if(!s) return null; const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function parseD(s){ if(!s) return null; const [y,m,d]=String(s).slice(0,10).split('-').map(Number); if(!y||!m||!d) return null; return new Date(y,m-1,d); }
+/* normaliza cualquier fecha que venga de Sheets a 'AAAA-MM-DD' */
+function normIso(v){
+  if(v===null || v===undefined || v==='') return '';
+  const s=String(v);
+  const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+'-'+m[2]+'-'+m[3];
+  const d=new Date(s); if(!isNaN(d)) return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return '';
+}
+/* asegura que cada tarea de Sheets tenga campos válidos */
+function normTask(t){
+  return {
+    id:String(t.id||('t'+Date.now()+Math.floor(Math.random()*999))),
+    nombre:(t.nombre!=null?String(t.nombre):'')||'(sin nombre)',
+    categoria:t.categoria||CATS[0].id,
+    responsable:t.responsable||'Por asignar',
+    fechaInicio:normIso(t.fechaInicio),
+    fechaFin:normIso(t.fechaFin),
+    estado:t.estado||'Pendiente',
+    prioridad:t.prioridad||'Media',
+    comentarios:t.comentarios!=null?String(t.comentarios):'',
+    avance:Number(t.avance)||0,
+  };
+}
 function fmtD(d){ if(!d || isNaN(d)) return '—'; return d.getDate()+' '+MESES_C[d.getMonth()].toLowerCase(); }
 function estCfg(e){ return ESTADOS[e] || {cls:'st-Pendiente',color:'#A8957E'}; }
 function priCfg(p){ return PRIORIDADES[p] || {cls:'pr-Media',color:'#C09A57'}; }
@@ -1194,14 +1217,18 @@ function onEstadoChange(){
 function saveTask(){
   const nombre=document.getElementById('m-nombre').value.trim();
   if(!nombre){ toast('Escribe un nombre para la tarea'); return; }
+  const prev = state.editId ? state.tasks.find(x=>x.id===state.editId) : null;
   const ini=document.getElementById('m-ini').value, fin=document.getElementById('m-fin').value;
   if(ini&&fin&&parseD(fin)<parseD(ini)){ toast('La fecha fin no puede ser anterior al inicio'); return; }
+  // si un campo de fecha quedó vacío, conserva la fecha que ya tenía la tarea
+  const iniF = ini || (prev&&prev.fechaInicio) || fin || fmtIso(today());
+  const finF = fin || (prev&&prev.fechaFin) || ini || fmtIso(today());
   const data={
     nombre,
     categoria:document.getElementById('m-cat').value,
     responsable:document.getElementById('m-resp').value.trim()||'Por asignar',
-    fechaInicio:ini||fin||fmtIso(today()),
-    fechaFin:fin||ini||fmtIso(today()),
+    fechaInicio:iniF,
+    fechaFin:finF,
     estado:document.getElementById('m-est').value,
     prioridad:document.getElementById('m-pri').value,
     avance:+document.getElementById('m-av').value,
@@ -1209,7 +1236,7 @@ function saveTask(){
   };
   if(data.estado==='Completado') data.avance=100;
   let target;
-  if(state.editId){ target=state.tasks.find(x=>x.id===state.editId); Object.assign(target,data); toast('Tarea actualizada'); }
+  if(state.editId){ target=prev; Object.assign(target,data); toast('Tarea actualizada'); }
   else { data.id='t'+Date.now(); state.tasks.push(data); target=data; toast('Tarea creada'); }
   persist(); syncUpsert(target); closeModal(); renderAll();
 }
@@ -1296,7 +1323,7 @@ async function init(){
   updateConnPill();
   if(Remote.on){
     try{
-      let rows=await Remote.list();
+      let rows=(await Remote.list()).map(normTask);
       if(!rows.length){ rows=SEED.map(t=>({...t})); await Remote.bulk(rows); }
       state.tasks=rows;
     }catch(e){
