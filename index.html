@@ -789,7 +789,9 @@ const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto'
 const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const DOWS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 function parseD(s){ if(!s) return null; const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
-function fmtD(d){ return d.getDate()+' '+MESES_C[d.getMonth()].toLowerCase(); }
+function fmtD(d){ if(!d || isNaN(d)) return '—'; return d.getDate()+' '+MESES_C[d.getMonth()].toLowerCase(); }
+function estCfg(e){ return ESTADOS[e] || {cls:'st-Pendiente',color:'#A8957E'}; }
+function priCfg(p){ return PRIORIDADES[p] || {cls:'pr-Media',color:'#C09A57'}; }
 function today(){ const t=new Date(); return new Date(t.getFullYear(),t.getMonth(),t.getDate()); }
 function daysBetween(a,b){ return Math.round((b-a)/86400000); }
 function isLate(t){ const f=parseD(t.fechaFin); return f && f < today() && t.estado!=='Completado'; }
@@ -856,7 +858,7 @@ function renderCategorias(){
 function taskRow(t){
   const r=respCfg(t.responsable); const late=isLate(t);
   return `<div class="ctask" onclick="openModal('${t.id}')">
-    <span class="ct-dot" style="background:${ESTADOS[t.estado].color}"></span>
+    <span class="ct-dot" style="background:${estCfg(t.estado).color}"></span>
     <div class="ct-main">
       <div class="ct-name">${escapeHtml(t.nombre)}${late?'<span class="ct-late">retrasada</span>':''}</div>
       <div class="ct-sub">${fmtD(parseD(t.fechaInicio))} – ${fmtD(parseD(t.fechaFin))}</div>
@@ -991,7 +993,7 @@ function renderGantt(){
     const left=(daysBetween(min,s)/totalDays)*100;
     const width=Math.max(((daysBetween(s,f)+1)/totalDays)*100,2.2);
     const c=catCfg(t.categoria); const late=isLate(t);
-    const barColor=ESTADOS[t.estado].color;
+    const barColor=estCfg(t.estado).color;
     return `<div class="gantt-row" ondragover="gRowDragOver(event)" ondragleave="gRowDragLeave(event)" ondrop="gRowDrop(event,'${t.id}')">
       <div class="g-label">
         <div class="gl-name">
@@ -1129,8 +1131,8 @@ function kanDrop(e,col){
 
 /* ----- CHIP ----- */
 function chip(type,val){
-  if(type==='st'){ const cfg=ESTADOS[val]; return `<span class="chip ${cfg.cls}"><span class="cdot" style="background:${cfg.color}"></span>${val}</span>`; }
-  const cfg=PRIORIDADES[val]; return `<span class="chip ${cfg.cls}"><span class="cdot" style="background:${cfg.color}"></span>${val}</span>`;
+  if(type==='st'){ const cfg=estCfg(val); return `<span class="chip ${cfg.cls}"><span class="cdot" style="background:${cfg.color}"></span>${val||'—'}</span>`; }
+  const cfg=priCfg(val); return `<span class="chip ${cfg.cls}"><span class="cdot" style="background:${cfg.color}"></span>${val||'—'}</span>`;
 }
 
 /* ----- CALENDARIO ----- */
