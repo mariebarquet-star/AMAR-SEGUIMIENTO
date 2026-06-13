@@ -701,6 +701,14 @@ const Store = {
 /* ---------- Conexión Google Sheets (Apps Script Web App) ----------
    Lee y escribe contra un Web App publicado desde Apps Script.
    El esquema de columnas del sheet coincide 1:1 con cada tarea. */
+/* =======================================================================
+   👉 PEGA AQUÍ LA URL DE TU GOOGLE SHEET (la del Web App, termina en /exec)
+   Cuando la pongas, el tablero se conecta SOLO en cualquier compu o celular,
+   sin tener que pulsar "Sheets" ni pegar nada cada vez.
+   Ejemplo: const SHEETS_URL = 'https://script.google.com/macros/s/AKfy.../exec';
+   ======================================================================= */
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycby_AimL9CgWl18YUngowSH_H1gIFVxxwfIGqlK8zSHqdL9EL31BHrlQYbaS2HQCr92f5A/exec';
+
 const CFG_KEY='amaru_sheets_url';
 const Remote={
   url:'',
@@ -1282,7 +1290,7 @@ function buildStaticUI(){
 async function init(){
   buildStaticUI();
   state.order=await loadOrder();
-  Remote.url=await loadCfg();
+  Remote.url=(SHEETS_URL && SHEETS_URL.trim()) ? SHEETS_URL.trim() : await loadCfg();
   updateConnPill();
   if(Remote.on){
     try{
